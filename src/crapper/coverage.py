@@ -441,7 +441,7 @@ def parse_jacoco_index(text: str) -> dict[str, list[JacocoMethod]]:
 
 @dataclass
 class CoverageBundle:
-    lcov: dict[str, dict[int, tuple[int, int]]] = field(default_factory=dict)
+    lcov: dict[str, FileCoverage] = field(default_factory=dict)
     go_profile: dict[str, list[tuple[int, int, int, int]]] | None = None
     jacoco: dict[str, list[JacocoMethod]] | None = None
     form_html: dict[str, dict[int, tuple[int, int]]] = field(default_factory=dict)
@@ -481,22 +481,35 @@ class CoverageBundle:
                 self.source_parts,
                 self.root,
             )
-        html = self._html_lines(function.path)
-        if html is not None:
-            return percent_for_range(html, function.start_line, function.end_line)
-        record = self._lcov_lines(function.path)
-        if record is None:
-            return None
-        branched = branch_percent(record, function.start_line, function.end_line)
-        if branched is not None:
-            return branched
-        return percent_for_range(record, function.start_line, function.end_line)
+        counts = self._lcov_counts_for(function)
+        if counts is None:
+            counts = self._html_lines(function.path)
+        return percent_for_range(counts, function.start_line, function.end_line)
+
+    def uncovered_lines_for(self, function: Function) -> tuple[int, ...]:
+        counts = self._lcov_counts_for(function)
+        if counts is None:
+            return ()
+        return tuple(sorted(
+            line for line, (covered, total) in counts.items()
+            if function.start_line <= line <= function.end_line and covered < total
+        ))
 
     def _html_lines(self, path: str) -> dict[int, tuple[int, int]] | None:
         return _lookup(self.form_html, path, self.source_parts, self.root)
 
     def _lcov_lines(self, path: str) -> dict[int, tuple[int, int]] | None:
         return _lookup(self.lcov, path, self.source_parts, self.root)
+
+    def _lcov_counts_for(self, function: Function) -> dict[int, tuple[int, int]] | None:
+        if function.language in {"java", "go"} or self._html_lines(function.path) is not None:
+            return None
+        record = self._lcov_lines(function.path)
+        if record is None:
+            return None
+        if branch_percent(record, function.start_line, function.end_line) is not None:
+            return record.branches
+        return record
 
 
 def _lookup(
