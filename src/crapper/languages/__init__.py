@@ -1,6 +1,7 @@
 """Per-language function extraction."""
 
 from crapper.languages.clojure import functions_in_source as clojure_functions
+from crapper.languages.cfamily import c_functions, cpp_functions
 from crapper.languages.csharp import functions_in_source as csharp_functions
 from crapper.languages.golang import functions_in_source as go_functions
 from crapper.languages.java import functions_in_source as java_functions
@@ -10,6 +11,8 @@ from crapper.languages.typescript import functions_in_source as typescript_funct
 from crapper.model import Function
 
 _READERS = {
+    "c": c_functions,
+    "cpp": cpp_functions,
     "clojure": clojure_functions,
     "java": java_functions,
     "go": go_functions,

@@ -6,6 +6,11 @@ from functools import lru_cache
 from pathlib import Path
 
 EXTENSIONS = {
+    ".c": "c",
+    **dict.fromkeys(
+        (".h", ".cc", ".cpp", ".cxx", ".c++", ".C", ".hpp", ".hh",
+         ".hxx", ".h++", ".H", ".ipp", ".inl", ".tcc"), "cpp",
+    ),
     ".clj": "clojure",
     ".cljc": "clojure",
     ".cljs": "clojure",
@@ -146,6 +151,12 @@ def _csharp_unscored(path: Path) -> bool:
     return bool(CSHARP_BUILD_DIRS.intersection(inside)) or _is_csharp_test_project(project)
 
 
+def _native_test(file_path: Path) -> bool:
+    return language_of(file_path) in {"c", "cpp"} and (
+        file_path.stem.startswith("test_") or file_path.stem.endswith(("_test", "_tests"))
+    )
+
+
 def is_test_file(path: str | Path) -> bool:
     """Whether `path` is test code, which crapper doesn't score.
 
@@ -155,6 +166,8 @@ def is_test_file(path: str | Path) -> bool:
 
     file_path = Path(path)
     name = file_path.name
+    if _native_test(file_path):
+        return True
     if name.endswith(GO_TEST_SUFFIX):
         return True
     if name.endswith(CLOJURE_TEST_SUFFIXES):

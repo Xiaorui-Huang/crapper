@@ -45,7 +45,13 @@ and prints a report sorted worst first.
 
 Languages: Clojure (.clj .cljc .cljs .bb), Java (.java), Go (.go),
 TypeScript and JavaScript (.ts .tsx .mts .cts .js .jsx .mjs .cjs),
-Rust (.rs), Python (.py), C# (.cs).
+Rust (.rs), Python (.py), C# (.cs), C (.c),
+C++ (.h .cpp .cc .cxx .C .hpp .hh .hxx .H .ipp .inl .tcc).
+
+C/C++: function definitions, methods, constructors, destructors, and operators.
+Coverage comes from a separate CMake/GCC build read through gcov JSON, or from
+a ready-made LCOV report. .h headers are parsed with the C++ grammar; the
+preprocessor is not run.
 
 Options:
   -h, --help                    Print this help and exit.
@@ -82,6 +88,7 @@ Coverage, when it is produced:
   Python       coverage.py LCOV, via pytest or unittest, per project
   C#           dotnet test --coverlet --coverlet-output-format lcov, once in
                the project root; test projects need coverlet.MTP
+  C/C++        CMake >= 3.26, GCC/gcov >= 9; target/coverage/cpp/lcov.info
 
 uml-viewer joins .metrics/crap.edn on :namespace and :name.
   Clojure      the ns, and the defn name

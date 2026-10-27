@@ -92,7 +92,7 @@ def _clean_dir(path: Path) -> None:
         shutil.rmtree(path)
 
 
-_COVERAGE_DIRS = {"typescript", "rust", "go", "python", "csharp"}
+_COVERAGE_DIRS = {"typescript", "rust", "go", "python", "csharp", "cpp"}
 
 
 def _outside_language_dirs(coverage: Path, path: Path) -> bool:
@@ -621,6 +621,16 @@ def _cover_csharp(root: Path) -> list[Report]:
     return reports
 
 
+def _cover_native(root: Path) -> list[Report]:
+    """CMake and GCC build, ctest, then gcov converted to LCOV in target/coverage/cpp."""
+
+    from crapper.native import run_native_coverage
+
+    report = root / "target" / "coverage" / "cpp" / "lcov.info"
+    code = run_native_coverage(root, run_shell, _warn)
+    return [Report(report, root, code)] if report.is_file() else []
+
+
 def _clear_reports(root: Path, languages: set[str]) -> None:
     """Remove the reports crapper's collectors write for these languages.
 
@@ -631,6 +641,8 @@ def _clear_reports(root: Path, languages: set[str]) -> None:
 
     for language in languages & {"typescript", "python", "rust", "csharp"}:
         _clean_dir(root / "target" / "coverage" / language)
+    if languages & {"c", "cpp"}:
+        (root / "target" / "coverage" / "cpp" / "lcov.info").unlink(missing_ok=True)
     if "typescript" in languages:
         _remove_lcov(root)
     if "clojure" in languages:
@@ -651,6 +663,8 @@ def collect_coverage(root: Path, files: list[Path]) -> list[Report]:
     languages = _languages_in(files)
     _clear_reports(root, languages)
     reports: list[Report] = []
+    if languages & {"c", "cpp"}:
+        reports += _cover_native(root)
     if "clojure" in languages:
         reports += _cover_clojure(root)
     if "java" in languages:
