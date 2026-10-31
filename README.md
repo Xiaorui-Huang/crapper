@@ -26,9 +26,12 @@ The first run creates `.venv` and installs the tool. On Windows, run `crapper.cm
 ./crapper --use-existing-coverage        # read reports already on disk
 ./crapper src/demo/core.clj src/ui       # these files and trees
 ./crapper --changed                      # git additions and edits
+./crapper --changed-since main           # everything the branch changed since main
 ./crapper combat                         # path fragment, same idea as crap4clj
 ./crapper --threshold 30                 # exit 2 when the worst score is higher
 ```
+
+`--changed` reads `git status`, so it sees only uncommitted work. `--changed-since <ref>` takes the merge base of `<ref>` and `HEAD` and selects what changed from there: the branch's commits, staged and unstaged edits, and untracked files. Commits that `<ref>` gained after the branch started are not selected.
 
 ## Snapshot
 

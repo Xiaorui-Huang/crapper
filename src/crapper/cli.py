@@ -61,6 +61,9 @@ Options:
                                 May be repeated.
   --changed                     Analyze added and modified source files from
                                 git status.
+  --changed-since <ref>         Analyze source files added or modified since
+                                the merge base of <ref> and HEAD: commits,
+                                staged and unstaged edits, and untracked files.
   --no-coverage                 Score complexity only. Coverage and CRAP are N/A.
   --use-existing-coverage       Read coverage already on disk. Do not rerun tests.
   --coverage-command <cmd>      Run this command instead of the per-language
@@ -114,6 +117,7 @@ class Options:
     coverage_command: str | None = None
     threshold: float | None = None
     changed: bool = False
+    changed_since: str | None = None
 
 
 def _take(args: list[str], index: int, option: str) -> str:
@@ -169,12 +173,22 @@ def parse_args(argv: list[str] | None = None) -> Options:
                 options.changed = True
                 index += 1
                 continue
+            if arg == "--changed-since":
+                options.changed_since = _take(args, index, arg)
+                index += 2
+                continue
             if arg.startswith("-"):
                 raise ValueError(f"Unknown option: {arg}")
             options.positionals.append(arg)
             index += 1
     except ValueError as exc:
         return Options(action="help", message=f"{exc}\n\n{HELP}", exit_code=1)
+    if options.changed and options.changed_since:
+        return Options(
+            action="help",
+            message=f"--changed cannot be combined with --changed-since\n\n{HELP}",
+            exit_code=1,
+        )
     if options.no_coverage and options.coverage_command:
         return Options(
             action="help",
@@ -202,12 +216,32 @@ def _git(root: Path, args: list[str]) -> subprocess.CompletedProcess[str]:
     )
 
 
+def _checked(result: subprocess.CompletedProcess[str], what: str) -> str:
+    if result.returncode != 0:
+        raise GitError(result.returncode, result.stderr.strip() or f"{what} failed")
+    return result.stdout
+
+
+def _existing_under(root: Path, top: Path, names: list[str]) -> list[Path]:
+    """Repository-relative names that are files under `root`.
+
+    Limiting to `root` lets `--root` be a subdirectory; deleted files drop out.
+    """
+
+    limit = root.resolve()
+    found: list[Path] = []
+    for name in names:
+        path = (top / name).resolve()
+        if path.is_file() and path.is_relative_to(limit):
+            found.append(path)
+    return found
+
+
 def _changed_files(root: Path) -> list[Path]:
     """Added and modified files from git, including files in new directories.
 
     Paths come from `git status -z`, which does not quote non-ASCII names.
-    They are resolved from the repository root, then limited to `root`, so
-    `--root` can be a subdirectory. Deleted files are left out.
+    They are resolved from the repository root, then limited to `root`.
     """
 
     top_result = _git(root, ["rev-parse", "--show-toplevel"])
@@ -228,15 +262,29 @@ def _changed_files(root: Path) -> list[Path]:
     if status.returncode != 0:
         raise GitError(status.returncode, status.stderr.strip() or "git status failed")
     top = Path(top_result.stdout.strip())
-    limit = root.resolve()
-    found: list[Path] = []
-    for entry in status.stdout.split("\0"):
-        if len(entry) < 4:
-            continue
-        path = (top / entry[3:]).resolve()
-        if path.is_file() and path.is_relative_to(limit):
-            found.append(path)
-    return found
+    names = [entry[3:] for entry in status.stdout.split("\0") if len(entry) >= 4]
+    return _existing_under(root, top, names)
+
+
+def _files_since(root: Path, ref: str) -> list[Path]:
+    """Files added or modified since the merge base of `ref` and HEAD.
+
+    This is the branch's review scope: its commits, staged and unstaged
+    edits, and untracked files. `-z` keeps non-ASCII names unquoted.
+    """
+
+    top = Path(_checked(_git(root, ["rev-parse", "--show-toplevel"]), "git rev-parse").strip())
+    base = _checked(_git(root, ["merge-base", ref, "HEAD"]), f"git merge-base {ref} HEAD").strip()
+    changed = _checked(
+        _git(root, ["diff", "--name-only", "-z", "--no-renames", "--diff-filter=d", base, "--", "."]),
+        "git diff",
+    )
+    untracked = _checked(
+        _git(root, ["ls-files", "-z", "--others", "--exclude-standard", "--full-name", "--", "."]),
+        "git ls-files",
+    )
+    names = [name for name in (changed + untracked).split("\0") if name]
+    return _existing_under(root, top, names)
 
 
 def _positionals(root: Path, args: list[str]) -> tuple[list[Path], list[str]]:
@@ -253,12 +301,8 @@ def _positionals(root: Path, args: list[str]) -> tuple[list[Path], list[str]]:
     return existing, filters
 
 
-def _changed_source(root: Path) -> list[Path]:
-    return [
-        path
-        for path in _changed_files(root)
-        if language_of(path) is not None and not is_test_file(path)
-    ]
+def _source_only(paths: list[Path]) -> list[Path]:
+    return [path for path in paths if language_of(path) is not None and not is_test_file(path)]
 
 
 def _explicit_files(existing: list[Path]) -> list[Path]:
@@ -273,7 +317,9 @@ def _explicit_files(existing: list[Path]) -> list[Path]:
 
 def _selected(options: Options, root: Path, existing: list[Path]) -> list[Path]:
     if options.changed:
-        return _changed_source(root)
+        return _source_only(_changed_files(root))
+    if options.changed_since:
+        return _source_only(_files_since(root, options.changed_since))
     if options.source_roots:
         return iter_source_files([(root / path).resolve() for path in options.source_roots])
     if existing:

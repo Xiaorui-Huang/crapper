@@ -853,3 +853,82 @@ def test_main_exits_with_the_status(monkeypatch):
         assert exc.code == 4
     else:
         raise AssertionError("main did not exit")
+
+
+def _repo(tmp_path: Path):
+    def git(*args: str) -> None:
+        subprocess.run(["git", "-C", str(tmp_path), *args], check=True, capture_output=True)
+
+    git("init", "-b", "main")
+    git("config", "user.email", "t@example.com")
+    git("config", "user.name", "t")
+    return git
+
+
+def test_since_selects_the_branch_scope_from_the_merge_base(tmp_path):
+    git = _repo(tmp_path)
+    _write(tmp_path, "src/base.py", "def base():\n    return 1\n")
+    _write(tmp_path, "src/edited.py", "def edited():\n    return 1\n")
+    _write(tmp_path, "src/gone.py", "def gone():\n    return 1\n")
+    git("add", "-A")
+    git("commit", "-m", "base")
+    git("switch", "-c", "feature")
+    _write(tmp_path, "src/committed.py", "def committed():\n    return 1\n")
+    git("rm", "-q", "src/gone.py")
+    git("add", "-A")
+    git("commit", "-m", "feature")
+    git("switch", "main")
+    _write(tmp_path, "src/upstream_only.py", "def upstream_only():\n    return 1\n")
+    _write(tmp_path, "src/base.py", "def base():\n    return 2\n")
+    git("add", "-A")
+    git("commit", "-m", "main moves on")
+    git("switch", "feature")
+    _write(tmp_path, "src/staged.py", "def staged():\n    return 1\n")
+    git("add", "src/staged.py")
+    _write(tmp_path, "src/edited.py", "def edited():\n    return 2\n")
+    _write(tmp_path, "src/untracked.py", "def untracked():\n    return 1\n")
+    _write(tmp_path, "src/test_untracked.py", "def test_untracked():\n    pass\n")
+
+    assert run(["--root", str(tmp_path), "--no-coverage", "--changed-since", "main"]) == 0
+    text = (tmp_path / ".metrics" / "crap.edn").read_text(encoding="utf-8")
+    for name in ("committed", "staged", "edited", "untracked"):
+        assert f':name "{name}"' in text
+    # main's own later commits and unchanged files are outside the branch scope;
+    # deleted files and tests are never analyzed.
+    for name in ("upstream_only", "base", "gone", "test_untracked"):
+        assert f':name "{name}"' not in text
+
+
+def test_since_is_limited_to_a_subdirectory_root(tmp_path):
+    git = _repo(tmp_path)
+    _write(tmp_path, "README", "x\n")
+    git("add", "-A")
+    git("commit", "-m", "base")
+    _write(tmp_path, "pkg/inside.py", "def inside():\n    return 1\n")
+    _write(tmp_path, "outside.py", "def outside():\n    return 1\n")
+
+    assert run(["--root", str(tmp_path / "pkg"), "--no-coverage", "--changed-since", "HEAD"]) == 0
+    text = (tmp_path / "pkg" / ".metrics" / "crap.edn").read_text(encoding="utf-8")
+    assert ':name "inside"' in text
+    assert "outside" not in text
+
+
+def test_since_an_unknown_ref_returns_gits_status(tmp_path, capsys):
+    git = _repo(tmp_path)
+    _write(tmp_path, "app.py", "def run():\n    return 1\n")
+    git("add", "-A")
+    git("commit", "-m", "base")
+
+    code = run(["--root", str(tmp_path), "--no-coverage", "--changed-since", "no-such-ref"])
+    assert code != 0
+    captured = capsys.readouterr()
+    assert "No source files" not in captured.out
+    assert "merge-base" in captured.err or "no-such-ref" in captured.err
+
+
+def test_since_needs_a_ref_and_excludes_changed():
+    assert parse_args(["--changed-since"]).exit_code == 1
+    assert parse_args(["--changed-since", "main"]).changed_since == "main"
+    combined = parse_args(["--changed", "--changed-since", "main"])
+    assert combined.action == "help"
+    assert combined.exit_code == 1
