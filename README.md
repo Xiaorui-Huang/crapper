@@ -12,6 +12,28 @@ CRAP = CC² × (1 − coverage)³ + CC
 
 ## Run
 
+### User-level installation
+
+With [uv](https://docs.astral.sh/uv/) installed, run these from this fork's
+checkout to install its command, rather than an upstream package:
+
+```text
+uv tool install .
+uv tool update-shell
+```
+
+Restart the shell if needed. After updating the checkout, run
+`uv tool install --force --no-cache .` from it to replace the installed snapshot.
+`uv tool uninstall crapper` removes the command. Windows and each WSL distro
+need separate installations; build from a shared checkout sequentially, not
+in multiple environments at once. Check `crapper --help`, the installed version,
+language support, exclusions, and side effects before a run.
+
+The tool writes metrics and a coverage run can replace reports or run project
+tests. Use an isolated copy for coverage; preserve working edits, record the
+commands and results, and verify source restoration. Report partial coverage as
+partial, not as a whole-branch score.
+
 ```bash
 ./crapper
 ```
@@ -32,6 +54,10 @@ The first run creates `.venv` and installs the tool. On Windows, run `crapper.cm
 ```
 
 `--changed` reads `git status`, so it sees only uncommitted work. `--changed-since <ref>` takes the merge base of `<ref>` and `HEAD` and selects what changed from there: the branch's commits, staged and unstaged edits, and untracked files. Commits that `<ref>` gained after the branch started are not selected.
+
+These options select whole files, not changed lines or before/after scores.
+State the scope first. Use the intended merge target as the explicit ref; a PR
+is not required.
 
 ## Uncovered lines
 
