@@ -56,7 +56,7 @@ def _git_status(root: Path, status: str):
     return fake
 
 
-@pytest.mark.skipif(shutil.which('bb') is None, reason='Для внешней проверки EDN нужен Babashka')
+@pytest.mark.skipif(shutil.which('bb') is None, reason='The external EDN check needs Babashka')
 def test_project_snapshot_is_readable_as_crap4clj_edn(tmp_path):
     _write(
         tmp_path,

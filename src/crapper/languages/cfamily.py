@@ -1,4 +1,4 @@
-"""Функции C/C++, области имён и цикломатическая сложность без препроцессора."""
+"""C/C++ functions, namespaces, and cyclomatic complexity, without the preprocessor."""
 
 from pathlib import Path
 

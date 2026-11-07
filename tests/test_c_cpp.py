@@ -98,7 +98,7 @@ def test_preprocessor_conditions_are_not_runtime_decisions():
 def test_missing_build_config_does_not_reuse_a_stale_native_report(tmp_path):
     report = tmp_path / 'target/coverage/cpp/lcov.info'
     report.parent.mkdir(parents=True)
-    report.write_text('Старое покрытие')
+    report.write_text('Old coverage')
     run_coverage(tmp_path, [tmp_path / 'a.cpp'], None)
     assert not report.exists()
 
@@ -130,7 +130,7 @@ def test_header_coverage_is_merged_across_translation_units(tmp_path):
     assert entry.coverage == 100.0
 
 
-@pytest.mark.skipif(not all(shutil.which(x) for x in ['gcc', 'g++', 'gcov', 'cmake', 'ctest']), reason='Нужны GCC и CMake')
+@pytest.mark.skipif(not all(shutil.which(x) for x in ['gcc', 'g++', 'gcov', 'cmake', 'ctest']), reason='Needs GCC and CMake')
 def test_default_coverage_builds_and_runs_a_mixed_c_cpp_project(tmp_path):
     (tmp_path / 'CMakeLists.txt').write_text('''cmake_minimum_required(VERSION 3.16)
 project(sample LANGUAGES C CXX)

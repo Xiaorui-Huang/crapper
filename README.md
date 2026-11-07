@@ -129,21 +129,21 @@ python3 -m venv .venv
 .venv/bin/pytest
 ```
 
-## Поддержка C/C++ в этом форке
+## C/C++ support in this fork
 
-Поддерживаются `.c`, `.cc`, `.cpp`, `.cxx`, `.c++`, `.C`, `.h`, `.hpp`,
-`.hh`, `.hxx`, `.h++`, `.H`, `.ipp`, `.inl`, `.tcc`. Файлы `.c` используют
-грамматику C; остальные расширения, включая неоднозначное `.h`, — C++.
-При обходе пропускаются `test_*`, `*_test`, `*_tests` и каталоги тестов;
-отдельный тестовый файл можно указать явно.
+Supported extensions: `.c`, `.cc`, `.cpp`, `.cxx`, `.c++`, `.C`, `.h`, `.hpp`,
+`.hh`, `.hxx`, `.h++`, `.H`, `.ipp`, `.inl`, `.tcc`. `.c` files use the C
+grammar. Every other extension, including the ambiguous `.h`, uses C++.
+A directory walk skips `test_*`, `*_test`, `*_tests` and test directories;
+a single test file can still be named explicitly.
 
-Разбираются определения функций, методы, конструкторы, деструкторы,
-операторы и шаблонные определения. Сложность учитывает условия, циклы,
-ветви `case`/`default`, `catch`, тернарные выражения и логические операторы.
-Лямбды и локальные классы учитываются внутри окружающей функции.
-Область имён метода — пространство имён и класс; для глобальной функции
-используется путь файла относительно корня проекта. Перегрузки сохраняют
-имя функции, как в исходной схеме отчёта.
+crapper scores function definitions, methods, constructors, destructors,
+operators, and template definitions. Complexity counts conditions, loops,
+`case`/`default` branches, `catch`, ternary expressions, and logical
+operators. Lambdas and local classes count toward the function around them.
+A method's namespace is its namespace and class. A free function uses its
+file path relative to the project root. Overloads keep the plain function
+name, as in the original report schema.
 
 ```bash
 ./crapper --root /path/to/project --no-coverage src include
@@ -151,32 +151,30 @@ python3 -m venv .venv
 ./crapper --root /path/to/project --use-existing-coverage src include
 ```
 
-Автоматическое покрытие требует `CMake >= 3.26`, GCC и совместимый с ним
-`gcov >= 9`. В корне проекта должен быть `CMakeLists.txt`, а тесты должны
-быть зарегистрированы в CTest. Инструмент создаёт отдельную сборку
-`target/coverage/cpp/build` с `--coverage -O0 -g`, запускает тесты,
-преобразует `gcov --json-format --branch-probabilities` в
-`target/coverage/cpp/lcov.info`. Существующая сборка проекта не используется.
-Перед повторным измерением удаляются предыдущие счётчики `.gcda`.
-Пустой список тестов считается ошибкой; при ошибке сборки или тестов
-новое покрытие не публикуется.
+Automatic coverage needs `CMake >= 3.26`, GCC, and a matching `gcov >= 9`.
+The project root must hold a `CMakeLists.txt`, and the tests must be
+registered with CTest. crapper makes its own build in
+`target/coverage/cpp/build` with `--coverage -O0 -g`, runs the tests, and
+converts `gcov --json-format --branch-probabilities` to
+`target/coverage/cpp/lcov.info`. Your existing build is not used. Old `.gcda`
+counters are deleted before each measurement. An empty test list is an error.
+When the build or the tests fail, the new coverage is not published.
 
-Для Clang, другой системы сборки или специальных флагов используйте
-`--coverage-command` с собственной сборкой и отчётом LCOV в
-`coverage/lcov.info` либо `target/coverage/**/lcov.info`.
-Готовые отчёты читаются с `--use-existing-coverage`. Ветви LCOV имеют
-приоритет перед строками; счётчики одного заголовка из разных единиц
-трансляции суммируются.
+For Clang, another build system, or special flags, use `--coverage-command`
+with your own build, and write an LCOV report to `coverage/lcov.info` or
+`target/coverage/**/lcov.info`. Ready-made reports are read with
+`--use-existing-coverage`. LCOV branch data wins over line data. Counts for
+one header from different translation units are summed.
 
-Разбор синтаксический: препроцессор, раскрытие макросов, разрешение
-шаблонов и анализ `compile_commands.json` не выполняются. Функции,
-целиком создаваемые макросами, могут отсутствовать в отчёте.
+The parse is syntactic. The preprocessor, macro expansion, template
+resolution, and `compile_commands.json` are not used. Functions that are
+generated entirely by macros can be missing from the report.
 
-Проверка C/C++:
+Checking the C/C++ support:
 
 ```bash
 .venv/bin/python -m pytest -q tests/test_c_cpp.py
 ```
 
-Тесты внешней совместимости EDN и загрузчика UML пропускаются, если
-отсутствуют Babashka (`bb`) и `/bin/zsh` соответственно.
+The external EDN compatibility tests and the UML loader tests are skipped when
+Babashka (`bb`) or `/bin/zsh` is missing.

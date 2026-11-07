@@ -1,4 +1,4 @@
-"""Покрытие C/C++: отдельная сборка CMake/GCC и преобразование gcov JSON в LCOV."""
+"""C/C++ coverage: a separate CMake/GCC build, with gcov JSON converted to LCOV."""
 
 import gzip
 import json
