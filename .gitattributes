@@ -1,2 +1,3 @@
+* text=auto eol=lf
 # cmd.exe reads a batch file's labels reliably only with CRLF line ends.
 *.cmd text eol=crlf
